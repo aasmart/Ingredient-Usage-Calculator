@@ -4,6 +4,7 @@ import re
 import sys
 
 PRODUCT_INGREDIENT_COLUMN = "Linked Nutritional Item MFR Note"
+NUM_ARGS = 4
 
 def get_data(file_name) -> pd.DataFrame:
     return pd.read_csv(file_name)
@@ -51,9 +52,16 @@ def calculate_product_scores(product_data, ingredient_weights: pd.DataFrame):
     return product_data
 
 def main():
+    if(len(sys.argv) != NUM_ARGS):
+        print("Invalid argument amount")
+
+    product_data_file_name = sys.argv[1]
+    ingredient_weights_file_name = sys.argv[2]
+    out_file_name = sys.argv[3]
+
     column_filter = ["Item Name", "Stock Unit", PRODUCT_INGREDIENT_COLUMN]
-    food_data = get_data("palm_oil.csv")
-    ingredient_weights = get_data("ingredient_weights.csv")
+    food_data = get_data(product_data_file_name)
+    ingredient_weights = get_data(ingredient_weights_file_name)
 
     # Filter out any non active food items
     filtered_data = food_data[food_data["Archive Status"].str.contains("Active")][column_filter]
@@ -63,8 +71,8 @@ def main():
     scored_products.sort_values("score", inplace=True)
     print("Scores calculated")
 
-    print("Writing scores...")
-    write_data(scored_products, "ingredients_out.csv")
-    print("Scores written")
+    print("Writing scores to \"%s\"..." % out_file_name)
+    write_data(scored_products, out_file_name)
+    print("Scores written to \"%s\"" % out_file_name)
 if __name__ == '__main__':
     main()
