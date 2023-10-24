@@ -73,9 +73,19 @@ def calculate_grams_per_dollar(
 
     return weights / cost
 
+def argError():
+    print(
+        """
+        Invalid arguments.
+        Expected: <product_file_name> <ingredient_weights_file_name> <out_file_name> <product_in_columns>
+                  <product_ingredients_column_name> <product_weight_col_name> <product_cost_col_name>
+
+        Received: """ + ' '.join(sys.argv)
+    )
+
 def main():
     if(len(sys.argv) < NUM_ARGS):
-        print("Invalid argument amount")
+        argError()
         return
 
     # Read in command line arguments
