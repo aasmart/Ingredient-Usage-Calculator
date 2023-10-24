@@ -80,7 +80,7 @@ def argError():
         Expected: <product_file_name> <ingredient_weights_file_name> <out_file_name> <product_in_columns>
                   <product_ingredients_column_name> <product_weight_col_name> <product_cost_col_name>
 
-        Received: """ + ' '.join(sys.argv)
+        Received: """ + ' '.join(sys.argv[1:])
     )
 
 def main():
