@@ -60,7 +60,7 @@ def calculate_product_scores(
     product_consumption_volumes = weights / np.max(weights)
     scores *= product_consumption_volumes
 
-    product_data["score"] = scores
+    product_data["score"] = np.round(scores,3)
     return product_data
 
 def calculate_grams_per_dollar(
@@ -71,7 +71,7 @@ def calculate_grams_per_dollar(
     weights = product_data[product_weight_col_name].to_numpy()
     cost = product_data[product_cost_col_name].to_numpy()
 
-    return weights / cost
+    return np.round(weights / cost,3)
 
 def argError():
     print(
