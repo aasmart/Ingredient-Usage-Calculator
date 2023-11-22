@@ -18,9 +18,12 @@ def get_product_with_ingredients(
 ) -> pd.DataFrame:
     """Returns a dataframe containing all products with a given array of ingredients"""
     ingredients_regex = "|".join(ingredients)
-    products[product_ingredients_column_name] = products[product_ingredients_column_name].str.lower()
     
-    return products.dropna()[products.dropna()[product_ingredients_column_name].str.contains(ingredients_regex)]
+    return products.dropna()[
+        products.dropna()[product_ingredients_column_name]
+            .str
+            .contains(ingredients_regex, regex=True, case=False)
+    ]
     
 def calculate_product_scores(
     product_data, 
@@ -33,7 +36,11 @@ def calculate_product_scores(
     ingredient_weights = ingredient_weights.dropna()
 
     # Get products with matching ingredients
-    product_data = get_product_with_ingredients(product_data, product_ingredients_column_name, search_ingredients)
+    product_data = get_product_with_ingredients(
+        product_data, 
+        product_ingredients_column_name, 
+        search_ingredients
+    )
 
     ingredients = product_data[product_ingredients_column_name].str.split(',').to_numpy()
 
@@ -52,7 +59,7 @@ def calculate_product_scores(
             score *= (num_ingredients - index[0]) / num_ingredients
 
             total_score += score
-        return round(total_score, 3)
+        return total_score
 
     scores = np.vectorize(calcRowScore)(ingredients)
 
@@ -60,7 +67,47 @@ def calculate_product_scores(
     product_consumption_volumes = weights / np.max(weights)
     scores *= product_consumption_volumes
 
-    product_data["score"] = np.round(scores,3)
+    product_data["score"] = scores
+    return product_data
+
+def calc_estimated_consumption(product_data, 
+    product_ingredients_column_name,
+    product_weight_col_name,
+    ingredient_weights: pd.DataFrame,
+):
+    # Get the ingredient names
+    search_ingredients = ingredient_weights[ingredient_weights["use_for_consumption"]]["ingredient"].dropna().array
+
+    # Get products with matching ingredients
+    product_data = get_product_with_ingredients(
+        product_data, 
+        product_ingredients_column_name, 
+        search_ingredients
+    )
+
+    ingredients = product_data[product_ingredients_column_name].str.split(',').to_numpy()
+
+    pattern = re.compile("|".join(search_ingredients), re.IGNORECASE)
+
+    def calcRowScore(ingredient_arr: np.array):
+        ingredient_arr = np.array(ingredient_arr)
+        num_ingredients = ingredient_arr.size
+        total_consumption_factor: int = 0
+        consumption_factor: int = 0
+
+        for index, ingredient in np.ndenumerate(ingredient_arr):            
+            if pattern.search(ingredient):
+                consumption_factor += (num_ingredients - index[0]) / num_ingredients
+
+            total_consumption_factor += (num_ingredients - index[0]) / num_ingredients
+        return consumption_factor / total_consumption_factor
+
+    factors = np.vectorize(calcRowScore)(ingredients)
+
+    weights = product_data[product_weight_col_name].to_numpy()
+    factors *= weights
+
+    product_data["Estimated Ingredient Consumption (g)"] = np.round(factors,3)
     return product_data
 
 def calculate_grams_per_dollar(
@@ -105,6 +152,14 @@ def main():
     column_filter = product_in_columns.split(",")
     filtered_data = food_data[food_data["Archive Status"].str.contains("Active")][column_filter]
 
+    print("Calculating estimated consumption...")
+    filtered_data = calc_estimated_consumption(
+        filtered_data,
+        product_ingredients_column_name,
+        product_weight_col_name,
+        ingredient_weights
+    )
+    print("Estimated consumption calculated")
     # Calculate scores
     print("Calculating Scores...")
     scored_products = calculate_product_scores(

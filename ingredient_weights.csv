@@ -1,2 +1,2 @@
-ingredient,weight
-palm,-100
+ingredient,weight,use_for_consumption
+palm,-1,true
