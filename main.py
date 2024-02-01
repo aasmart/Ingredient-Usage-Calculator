@@ -2,8 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 import sys
-
-NUM_ARGS = 7
+import getopt
 
 def get_data(file_name) -> pd.DataFrame:
     return pd.read_csv(file_name + ".csv")
@@ -120,29 +119,67 @@ def calculate_grams_per_dollar(
 
     return np.round(weights / cost,3)
 
-def argError():
-    print(
-        """
-        Invalid arguments.
-        Expected: <product_file_name> <ingredient_weights_file_name> <out_file_name> <product_in_columns>
-                  <product_ingredients_column_name> <product_weight_col_name> <product_cost_col_name>
-
-        Received: """ + ' '.join(sys.argv[1:])
+def main():
+    args = sys.argv[1:]
+    optlist, args = getopt.getopt(
+        args=args,
+        shortopts="sv",
+        longopts=[
+            "datafile=",
+            "outfile=",
+            "weights=",
+            "cols=",
+            "icol=",
+            "wcol=",
+            "ccol="
+        ]
     )
 
-def main():
-    if(len(sys.argv) < NUM_ARGS):
-        argError()
-        return
-
     # Read in command line arguments
-    product_data_file_name = sys.argv[1]
-    ingredient_weights_file_name = sys.argv[2]
-    out_file_name = sys.argv[3]
-    product_in_columns = sys.argv[4]
-    product_ingredients_column_name = sys.argv[5]
-    product_weight_col_name = sys.argv[6]
-    product_cost_col_name = sys.argv[7]
+    product_data_file_name = ""
+    ingredient_weights_file_name = ""
+    out_file_name = ""
+    product_in_columns = ""
+    product_ingredients_column_name = ""
+    product_weight_col_name = ""
+    product_cost_col_name = ""
+
+    calc_scores = False
+    verbose = False
+
+    for opt, arg in optlist:
+        if(opt == '--datafile'):
+            product_data_file_name = arg
+        elif(opt == "--outfile"):
+            out_file_name = arg
+        elif(opt == "--weights"):
+            ingredient_weights_file_name = arg
+        elif(opt == "--cols"):
+            product_in_columns = arg
+        elif(opt == "--icol"):
+            product_ingredients_column_name = arg
+        elif(opt == "--wcol"):
+            product_weight_col_name = arg
+        elif(opt == "--ccol"):
+            product_cost_col_name = arg
+        elif(opt == "-s"):
+            calc_scores = True
+        elif(opt == "-v"):
+            verbose = True
+
+    # Required argument handling
+    if(len(product_data_file_name) <= 0):
+        print("Missing in file location")
+        return
+    elif(len(out_file_name) <= 0):
+        print("Missing out file destination")
+        return
+    elif(len(product_ingredients_column_name) <= 0):
+        print("Missing product ingredients column name")
+        return
+    elif(len(product_weight_col_name) <= 0):
+        print("Missing product weights column name")
+        return
 
     # Read in data files
     food_data = get_data(product_data_file_name)
@@ -152,36 +189,49 @@ def main():
     column_filter = product_in_columns.split(",")
     filtered_data = food_data[food_data["Archive Status"].str.contains("Active")][column_filter]
 
-    print("Calculating estimated consumption...")
+    if(verbose):
+        print("Calculating estimated consumption...")
     filtered_data = calc_estimated_consumption(
         filtered_data,
         product_ingredients_column_name,
         product_weight_col_name,
         ingredient_weights
     )
-    print("Estimated consumption calculated")
+    if(verbose):
+        print("Estimated consumption calculated.")
+    
     # Calculate scores
-    print("Calculating Scores...")
-    scored_products = calculate_product_scores(
-        filtered_data, 
-        product_ingredients_column_name, 
-        product_weight_col_name,
-        ingredient_weights
-    )
-    scored_products.sort_values("score", inplace=True)
-    print("Scores calculated")
+    if(calc_scores):
+        if(verbose):
+            print("Calculating Scores...")
+        filtered_data = calculate_product_scores(
+            filtered_data, 
+            product_ingredients_column_name, 
+            product_weight_col_name,
+            ingredient_weights
+        )
+        filtered_data.sort_values("score", inplace=True)
+        if(verbose):
+            print("Finished calculating scores.")
 
-    # Grams / Dollar calculation
-    scored_products["g/$"] = calculate_grams_per_dollar(
-        scored_products,
-        product_weight_col_name,
-        product_cost_col_name
-    )
+    if(len(product_weight_col_name) > 0 and len(product_cost_col_name) > 0):
+        if(verbose):
+            print("Calculating grams per dollar...")
+        # Grams / Dollar calculation
+        filtered_data["g/$"] = calculate_grams_per_dollar(
+            filtered_data,
+            product_weight_col_name,
+            product_cost_col_name
+        )
+        if(verbose):
+            print("Finished calculating grams per dollar.")
 
     # Write scores to out file
-    print("Writing scores to \"%s\"..." % out_file_name)
-    write_data(scored_products, out_file_name)
-    print("Scores written to \"%s\"" % out_file_name)
+    if(verbose):
+        print("Writing scores to \"%s\"..." % out_file_name)
+    write_data(filtered_data, out_file_name)
+    if(verbose):
+        print("Scores written to \"%s\"" % out_file_name)
 
 if __name__ == '__main__':
     main()
