@@ -84,9 +84,7 @@ def calc_estimated_consumption(product_data,
         search_ingredients
     )
 
-    ingredients = product_data[product_ingredients_column_name].str.split(',').to_numpy()
-
-    pattern = re.compile("|".join(search_ingredients), re.IGNORECASE)
+    ingredients = product_data[product_ingredients_column_name].str.split(',|;').to_numpy()
 
     def calcRowScore(ingredient_arr: np.array):
         ingredient_arr = np.array(ingredient_arr)
@@ -94,11 +92,16 @@ def calc_estimated_consumption(product_data,
         total_consumption_factor: int = 0
         consumption_factor: int = 0
 
-        for index, ingredient in np.ndenumerate(ingredient_arr):            
-            if pattern.search(ingredient):
-                consumption_factor += (num_ingredients - index[0]) / num_ingredients
+        for index, ingredient in np.ndenumerate(ingredient_arr):
+            score = 10 * np.e**-(index[0] / (num_ingredients * 0.5))
+            for p in search_ingredients:
+                pattern = re.compile(p, re.IGNORECASE)
+                if pattern.search(ingredient):
+                    weight = float(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['weight'])
+                    consumption_factor += (score * weight)
+                    break
 
-            total_consumption_factor += (num_ingredients - index[0]) / num_ingredients
+            total_consumption_factor += score
         return consumption_factor / total_consumption_factor
 
     factors = np.vectorize(calcRowScore)(ingredients)
@@ -187,7 +190,10 @@ def main():
 
     # Filter out any non active food items
     column_filter = product_in_columns.split(",")
-    filtered_data = food_data[food_data["Archive Status"].str.contains("Active")][column_filter]
+    filtered_data = food_data
+    if 'Archive Status' in filtered_data:
+        filtered_data = food_data[food_data["Archive Status"].str.contains("Active")]
+    filtered_data = filtered_data[column_filter]
 
     if(verbose):
         print("Calculating estimated consumption...")

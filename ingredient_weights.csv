@@ -1,2 +1,3 @@
 ingredient,weight,use_for_consumption
-palm,-1,true
+vitamin a palmitate,0.01,true
+palm,1,true
