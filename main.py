@@ -1,14 +1,13 @@
 import pandas as pd
 import numpy as np
 import re
-import sys
-import getopt
+import argparse as ap
 
 def get_data(file_name) -> pd.DataFrame:
-    return pd.read_csv(file_name + ".csv")
+    return pd.read_csv(file_name)
 
 def write_data(data: pd.DataFrame, out_file):
-    data.to_csv(out_file + ".csv", ",", index=False, float_format='%.6f')
+    data.to_csv(out_file, ",", index=False, float_format='%.6f')
 
 def get_product_with_ingredients(
         products: pd.DataFrame, 
@@ -41,7 +40,7 @@ def calculate_product_scores(
         search_ingredients
     )
 
-    ingredients = product_data[product_ingredients_column_name].str.split(',').to_numpy()
+    ingredients = product_data[product_ingredients_column_name].str.split(',|;').to_numpy()
 
     def calcRowScore(ingredient_arr: np.array):
         ingredient_arr = np.array(ingredient_arr)
@@ -63,7 +62,7 @@ def calculate_product_scores(
     scores = np.vectorize(calcRowScore)(ingredients)
 
     weights = product_data[product_weight_col_name].to_numpy()
-    product_consumption_volumes = weights / np.max(weights)
+    product_consumption_volumes = weights
     scores *= product_consumption_volumes
 
     product_data["score"] = scores
@@ -144,122 +143,119 @@ def calculate_grams_per_dollar(
 
     return np.round(weights / cost,3)
 
+class Argument:
+    def __init__(self, name_long: str, description: str, name_short = "", positional: bool = False, type: type = None):
+        self._name_long = name_long
+        self._name_short = name_short
+        self.type = type
+        self.description = description
+        self.positional = positional
+
+    def get_long_name(self):
+        if(self.positional):
+            return self._name_long
+        return "--" + self._name_long
+    
+    def get_short_name(self):
+        return "-" + self._name_short
+
+command_args = [
+    Argument("data", positional=True, type=str, description="A CSV file path containing the product data to analyze"),
+    Argument("out", positional=True, type=str, description="A CSV file path indicating where the output of the program will go"),
+    Argument("weights", positional=True, type=str, description="A CSV file path of the file containing the ingredient weights"),
+    Argument("cols", positional=True, type=str, description="A comma separated string of the names of the columns to read in from the data CSV"),
+    Argument("icol", positional=True, type=str, description="The name of the ingredient list column in the data CSV"),
+    Argument("wcol", positional=True, type=str, description="The name of the weight column in the data CSV"),
+    Argument("ccol", positional=False, type=str, description="The name of the cost column in the dats CSV"),
+    Argument("verbose", name_short="v", positional=False, type=bool, description="Run the program in verbose mode"),
+    Argument("score", name_short="s", positional=False, type=bool, description="Calculate the item score"),
+]
+
 def main():
-    args = sys.argv[1:]
-    optlist, args = getopt.getopt(
-        args=args,
-        shortopts="sv",
-        longopts=[
-            "datafile=",
-            "outfile=",
-            "weights=",
-            "cols=",
-            "icol=",
-            "wcol=",
-            "ccol="
-        ]
+    parser = ap.ArgumentParser(
+        prog='Product Usage Calculator',
+        description="""
+            Calculates various information about a large amount of retail products.
+            """
     )
 
-    # Read in command line arguments
-    product_data_file_name = ""
-    ingredient_weights_file_name = ""
-    out_file_name = ""
-    product_in_columns = ""
-    product_ingredients_column_name = ""
-    product_weight_col_name = ""
-    product_cost_col_name = ""
+    for arg in command_args:
+        if(len(arg._name_long) > 0 and len(arg._name_short) > 0):
+            parser.add_argument(
+                arg.get_long_name(),
+                arg.get_short_name(), 
+                type=arg.type, 
+                help=arg.description
+            )
+        elif(len(arg._name_long) > 0):
+            parser.add_argument(
+                arg.get_long_name(),
+                type=arg.type, 
+                help=arg.description
+            )
+        else:
+            parser.add_argument(
+                arg.get_short_name(),
+                type=arg.type, 
+                help=arg.description
+            )
 
-    calc_scores = False
-    verbose = False
-
-    for opt, arg in optlist:
-        if(opt == '--datafile'):
-            product_data_file_name = arg
-        elif(opt == "--outfile"):
-            out_file_name = arg
-        elif(opt == "--weights"):
-            ingredient_weights_file_name = arg
-        elif(opt == "--cols"):
-            product_in_columns = arg
-        elif(opt == "--icol"):
-            product_ingredients_column_name = arg
-        elif(opt == "--wcol"):
-            product_weight_col_name = arg
-        elif(opt == "--ccol"):
-            product_cost_col_name = arg
-        elif(opt == "-s"):
-            calc_scores = True
-        elif(opt == "-v"):
-            verbose = True
-
-    # Required argument handling
-    if(len(product_data_file_name) <= 0):
-        print("Missing in file location")
-        return
-    elif(len(out_file_name) <= 0):
-        print("Missing out file destination")
-        return
-    elif(len(product_ingredients_column_name) <= 0):
-        print("Missing product ingredients column name")
-        return
-    elif(len(product_weight_col_name) <= 0):
-        print("Missing product weights column name")
-        return
+    args = parser.parse_args()
 
     # Read in data files
-    food_data = get_data(product_data_file_name)
-    ingredient_weights = get_data(ingredient_weights_file_name)
+    food_data = get_data(args.data)
+    ingredient_weights = get_data(args.weights)
 
     # Filter out any non active food items
-    column_filter = product_in_columns.split(",")
+    column_filter = args.cols.split(",")
     filtered_data = food_data
     if 'Archive Status' in filtered_data:
         filtered_data = food_data[food_data["Archive Status"].str.contains("Active")]
     filtered_data = filtered_data[column_filter]
 
-    if(verbose):
-        print("Calculating estimated consumption...")
+    if(args.verbose):
+        print("Calculating estimated consumption...", end=' ')
     filtered_data = calc_estimated_consumption(
         filtered_data,
-        product_ingredients_column_name,
-        product_weight_col_name,
+        args.icol,
+        args.wcol,
         ingredient_weights
     )
-    if(verbose):
-        print("Estimated consumption calculated.")
+    if(args.verbose):
+        print("FINISHED")
     
     # Calculate scores
-    if(calc_scores):
-        if(verbose):
-            print("Calculating Scores...")
+    if(args.score):
+        if(args.verbose):
+            print("Calculating Scores...", end=' ')
         filtered_data = calculate_product_scores(
             filtered_data, 
-            product_ingredients_column_name, 
-            product_weight_col_name,
+            args.icol, 
+            args.wcol,
             ingredient_weights
         )
         filtered_data.sort_values("score", inplace=True)
-        if(verbose):
-            print("Finished calculating scores.")
+        if(args.verbose):
+            print("FINISHED")
 
-    if(len(product_weight_col_name) > 0 and len(product_cost_col_name) > 0):
-        if(verbose):
-            print("Calculating grams per dollar...")
+    if(args.ccol and len(args.wcol) > 0 and len(args.ccol) > 0):
+        if(args.verbose):
+            print("Calculating weight per cost...", end=' ')
         # Grams / Dollar calculation
         filtered_data["g/$"] = calculate_grams_per_dollar(
             filtered_data,
-            product_weight_col_name,
-            product_cost_col_name
+            args.wcol,
+            args.ccol
         )
-        if(verbose):
-            print("Finished calculating grams per dollar.")
+        if(args.verbose):
+            print("FINISHED")
 
     # Write scores to out file
-    if(verbose):
-        print("Writing scores to \"%s\"..." % out_file_name)
-    write_data(filtered_data, out_file_name)
-    if(verbose):
-        print("Scores written to \"%s\"" % out_file_name)
+    if(args.verbose):
+        print("Writing scores to \"%s\"..." % args.out, end=' ')
+    write_data(filtered_data, args.out)
+    if(args.verbose):
+        print("FINISHED")
 
 if __name__ == '__main__':
     main()
