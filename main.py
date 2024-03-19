@@ -8,7 +8,7 @@ def get_data(file_name) -> pd.DataFrame:
     return pd.read_csv(file_name + ".csv")
 
 def write_data(data: pd.DataFrame, out_file):
-    data.to_csv(out_file + ".csv", ",", index=False)
+    data.to_csv(out_file + ".csv", ",", index=False, float_format='%.6f')
 
 def get_product_with_ingredients(
         products: pd.DataFrame, 
@@ -75,33 +75,55 @@ def calc_estimated_consumption(product_data,
     ingredient_weights: pd.DataFrame,
 ):
     # Get the ingredient names
-    search_ingredients = ingredient_weights[ingredient_weights["use_for_consumption"]]["ingredient"].dropna().array
+    search_ingredients = ingredient_weights["ingredient"].dropna().array
 
     # Get products with matching ingredients
     product_data = get_product_with_ingredients(
         product_data, 
         product_ingredients_column_name, 
-        search_ingredients
+        ingredient_weights[ingredient_weights["use_for_consumption"]]["ingredient"].dropna().array
     )
 
     ingredients = product_data[product_ingredients_column_name].str.split(',|;').to_numpy()
 
+    # Pattern for matching the "less than 2% of"
+    two_percent_pattern = re.compile("2%")
+    zero_five_percent_pattern = re.compile("0.5%")
+    contain_pattern = re.compile("may contain")
+
     def calcRowScore(ingredient_arr: np.array):
+        """
+        Calculates the estimated palm oil consumption for a single row
+        """
         ingredient_arr = np.array(ingredient_arr)
         num_ingredients = ingredient_arr.size
         total_consumption_factor: int = 0
         consumption_factor: int = 0
 
+        # Indicates if a "less than x of" has been reached for the current ingredient list
+        percent_reweight = 1
         for index, ingredient in np.ndenumerate(ingredient_arr):
-            score = 10 * np.e**-(index[0] / (num_ingredients * 0.5))
+            score = np.e**-(index[0] / (num_ingredients * 0.5))
+            
+            if(contain_pattern.search(ingredient)):
+                break
+
+            if(two_percent_pattern.search(ingredient)):
+                percent_reweight = 0.02
+            if(zero_five_percent_pattern.search(ingredient)):
+                percent_reweight = 0.005
+            score *= percent_reweight
+
+            weight = 1
             for p in search_ingredients:
                 pattern = re.compile(p, re.IGNORECASE)
                 if pattern.search(ingredient):
-                    weight = float(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['weight'])
-                    consumption_factor += (score * weight)
+                    weight = float(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['weight'])                    
+                    if(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['use_for_consumption'].bool()):
+                        consumption_factor += score * weight
                     break
 
-            total_consumption_factor += score
+            total_consumption_factor += score * weight
         return consumption_factor / total_consumption_factor
 
     factors = np.vectorize(calcRowScore)(ingredients)
