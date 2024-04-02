@@ -43,7 +43,7 @@ def calculate_product_scores(
 
     ingredients = product_data[product_ingredients_column_name].str.split(',|;').to_numpy()
 
-    def calcRowScore(ingredient_arr: np.array):
+    def calc_row_score(ingredient_arr: np.array):
         ingredient_arr = np.array(ingredient_arr)
         num_ingredients = ingredient_arr.size
         total_score: int = 0
@@ -60,7 +60,7 @@ def calculate_product_scores(
             total_score += score
         return total_score
 
-    scores = np.vectorize(calcRowScore)(ingredients)
+    scores = np.vectorize(calc_row_score)(ingredients)
 
     weights = product_data[product_weight_col_name].to_numpy()
     product_consumption_volumes = weights
@@ -87,11 +87,11 @@ def calc_estimated_consumption(product_data,
     # Split string
     ingredients = product_data[product_ingredients_column_name].apply(ps.paren_split)
 
-    # Pattern for matching the "less than 2% of"
-    percent_pattern = re.compile("\d%")
+    # Pattern for matching the "less than x% of"
+    percent_pattern = re.compile("\d+%")
     contain_pattern = re.compile("may contain")
 
-    def calcRowScore(ingredient_arr):
+    def calc_row_consumption(ingredient_arr):
         """
         Calculates the estimated palm oil consumption for a single row
         """
@@ -126,7 +126,7 @@ def calc_estimated_consumption(product_data,
                     break
 
             if not matched and is_nested:
-                subscore = calcRowScore(ingredients[1])
+                subscore = calc_row_consumption(ingredients[1])
                 # If the item is comprised of 100% of the target ingredient, then this item is basically those ingredients,
                 # but just choose whatever the first one is
                 if(subscore >= .99):
@@ -143,7 +143,7 @@ def calc_estimated_consumption(product_data,
             return 0
         return consumption_factor / total_consumption_factor
 
-    factors = np.vectorize(calcRowScore)(ingredients)
+    factors = np.vectorize(calc_row_consumption)(ingredients)
 
     # Multiply by volume
     product_volume = product_data[product_weight_col_name].to_numpy()
@@ -182,7 +182,13 @@ command_args = [
     Argument("data", positional=True, type=str, description="A CSV file path containing the product data to analyze"),
     Argument("out", positional=True, type=str, description="A CSV file path indicating where the output of the program will go"),
     Argument("weights", positional=True, type=str, description="A CSV file path of the file containing the ingredient weights"),
-    Argument("cols", positional=True, type=str, description="A comma separated string of the names of the columns to read in from the data CSV"),
+    Argument(
+        "cols", 
+        positional=True, 
+        type=str, 
+        description="A comma separated string of the names of the columns to read in from the data CSV. This must also include the columns used \
+            lated in this command."
+    ),
     Argument("icol", positional=True, type=str, description="The name of the ingredient list column in the data CSV"),
     Argument("wcol", positional=True, type=str, description="The name of the weight column in the data CSV"),
     Argument("ccol", positional=False, type=str, description="The name of the cost column in the dats CSV"),
