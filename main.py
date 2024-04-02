@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 import argparse as ap
+import paren_split as ps
 
 def get_data(file_name) -> pd.DataFrame:
     return pd.read_csv(file_name)
@@ -83,52 +84,70 @@ def calc_estimated_consumption(product_data,
         ingredient_weights[ingredient_weights["use_for_consumption"]]["ingredient"].dropna().array
     )
 
-    ingredients = product_data[product_ingredients_column_name].str.split(',|;').to_numpy()
+    # Split string
+    ingredients = product_data[product_ingredients_column_name].apply(ps.paren_split)
 
     # Pattern for matching the "less than 2% of"
-    two_percent_pattern = re.compile("2%")
-    zero_five_percent_pattern = re.compile("0.5%")
+    percent_pattern = re.compile("\d%")
     contain_pattern = re.compile("may contain")
 
-    def calcRowScore(ingredient_arr: np.array):
+    def calcRowScore(ingredient_arr):
         """
         Calculates the estimated palm oil consumption for a single row
         """
-        ingredient_arr = np.array(ingredient_arr)
-        num_ingredients = ingredient_arr.size
-        total_consumption_factor: int = 0
+        num_ingredients = len(ingredient_arr)
+        total_consumption_factor: int = 0 
         consumption_factor: int = 0
 
         # Indicates if a "less than x of" has been reached for the current ingredient list
         percent_reweight = 1
-        for index, ingredient in np.ndenumerate(ingredient_arr):
-            score = np.e**-(index[0] / (num_ingredients * 0.5))
+        for index, ingredients in enumerate(ingredient_arr):
+            is_nested = type(ingredients) == list
+            score = np.e**-(index / (num_ingredients * 0.5))
+            
+            ingredient = ingredients[0] if is_nested else ingredients
             
             if(contain_pattern.search(ingredient)):
                 break
 
-            if(two_percent_pattern.search(ingredient)):
-                percent_reweight = 0.02
-            if(zero_five_percent_pattern.search(ingredient)):
-                percent_reweight = 0.005
+            if(percent_pattern.search(ingredient)):
+                percent_reweight = float(percent_pattern.findall(ingredient)[0].replace("%", "")) / 100
             score *= percent_reweight
 
             weight = 1
+            matched = False
             for p in search_ingredients:
                 pattern = re.compile(p, re.IGNORECASE)
                 if pattern.search(ingredient):
                     weight = float(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['weight'])                    
                     if(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['use_for_consumption'].bool()):
                         consumption_factor += score * weight
+                    matched = True
                     break
 
+            if not matched and is_nested:
+                subscore = calcRowScore(ingredients[1])
+                # If the item is comprised of 100% of the target ingredient, then this item is basically those ingredients,
+                # but just choose whatever the first one is
+                if(subscore >= .99):
+                    for p in search_ingredients:
+                        pattern = re.compile(p, re.IGNORECASE)
+                        if pattern.search(ingredients[1][0]):
+                            weight = float(ingredient_weights.loc[ingredient_weights['ingredient'] == p]['weight'])
+                            break
+                consumption_factor += score * weight * subscore
+
             total_consumption_factor += score * weight
+
+        if total_consumption_factor == 0:
+            return 0
         return consumption_factor / total_consumption_factor
 
     factors = np.vectorize(calcRowScore)(ingredients)
 
-    weights = product_data[product_weight_col_name].to_numpy()
-    factors *= weights
+    # Multiply by volume
+    product_volume = product_data[product_weight_col_name].to_numpy()
+    factors *= product_volume
 
     product_data["Estimated Ingredient Consumption (g)"] = np.round(factors,3)
     return product_data

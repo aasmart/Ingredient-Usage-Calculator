@@ -1,3 +1,5 @@
 ingredient,weight,use_for_consumption
-vitamin a palmitate,0.01,true
-palm,1,true
+a palmitate,0.0001,true
+palm,0.25,true
+mono and diglycerides,.001,false
+polysorbate 60,.001,false
