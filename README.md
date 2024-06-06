@@ -4,9 +4,9 @@ A program I wrote for a palm oil reduction product. This program attempts to est
 If you encounter any bugs, issues, or feature requests, please feel free to make an issue!
 
 ## Features
-- Estimated the palm oil in a product. This takes into account the ordering of ingredients in the ingredient list, sub ingredients, "may contain", and "contains less than x% of". A custom ingredients weight file can be fed to modify how much each time contributes to the total estimated calculation. This "reweight" can be applied to non-target ingredients without impacting the target estimation score.
+- Estimates the palm oil in a product. This takes into account the ordering of ingredients in the ingredient list, sub ingredients, "may contain", and "contains less than x% of". A custom ingredients weight file can be fed to modify how much each time contributes to the total estimated calculation. This "reweight" can be applied to non-target ingredients without impacting the target estimation score.
 - (enable with optional command flag) Grams per dollar calculation
-- (enable with optional command flag) A product "score" based on an items ingredients. This metric just scores a product on "how good it is" based on the ingredient weights
+- (enable with optional command flag) A product "score" based on an items ingredients. This metric just scores a product on "how good it is" based on the ingredient weights. Note: this is not the best calculation.
 
 ## Usage
 Run the `palm_calc` script with the `--help` flag enabled to learn how to use the program.
