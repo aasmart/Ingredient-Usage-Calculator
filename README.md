@@ -9,7 +9,16 @@ If you encounter any bugs, issues, or feature requests, please feel free to make
 - (enable with optional command flag) A product "score" based on an items ingredients. This metric just scores a product on "how good it is" based on the ingredient weights. Note: this is not the best calculation.
 
 ## Usage
-Run the `palm_calc` script with the `--help` flag enabled to learn how to use the program.
+Download the script and the latest version of [Python](https://www.python.org/). Run the `ingredient_calc` script with the `--help` flag enabled to learn how to use the program:
+```
+$ ingredient_calc --help
+```
+
+As an example on how to calculate the score for a file name `products.csv`, output it to `out.csv`, with an ingredient weights file `ingredient_weights.csv`, ingredient column `ingredients`, and a weight column named `weight`. This command should be run in the same directory as the `ingredient_calc` script
+```
+$ ingredient_calc products.csv out.csv ingredient_weights.csv "item_name,ingredients,weight" "ingredients" "weight"
+```
+The error messages outputted by the program aren't thte most user friendly, so if you encounter anything you don't understand, go ahead and make an issue!
 
 ### Ingredient Weights
 Ingredient weights are set in a CSV file in the following format:
