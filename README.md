@@ -9,7 +9,7 @@ If you encounter any bugs, issues, or feature requests, please feel free to make
 - (enable with optional command flag) A product "score" based on an items ingredients. This metric just scores a product on "how good it is" based on the ingredient weights. Note: this is not the best calculation.
 
 ## Usage
-Download the script and the latest version of [Python](https://www.python.org/). Run the `ingredient_calc` script with the `--help` flag enabled to learn how to use the program:
+Download the [ingredient_calc](https://github.com/aasmart/Ingredient-Usage-Calculator/releases/tag/1.0) script and the latest version of [Python](https://www.python.org/). Run the `ingredient_calc` script with the `--help` flag enabled to learn how to use the program:
 ```
 $ ingredient_calc --help
 ```
